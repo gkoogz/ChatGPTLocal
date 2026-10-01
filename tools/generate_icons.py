@@ -33,12 +33,13 @@ def draw_icon(size: int) -> Image.Image:
 
     monitor = box((160, 165, 242, 220))
     radius = round(7 * scale)
-    outline = round(4 * scale)
-    draw.rounded_rectangle(monitor, radius=radius, fill="#f4f4f4")
-    draw.rounded_rectangle(box((168, 173, 234, 211)), radius=round(3 * scale), fill="#050505")
-    draw.rounded_rectangle(box((172, 177, 230, 207)), radius=round(2 * scale), outline="#a8e6cf", width=round(2 * scale))
-    draw.line(points([(188, 226), (216, 226)]), fill="#f4f4f4", width=outline)
-    draw.line(points([(202, 220), (202, 226)]), fill="#f4f4f4", width=outline)
+    line_width = round(4 * scale)
+    white = "#f4f4f4"
+    black = "#050505"
+    draw.rounded_rectangle(monitor, radius=radius, fill=black, outline=white, width=line_width)
+    draw.rounded_rectangle(box((168, 173, 234, 211)), radius=round(3 * scale), outline=white, width=line_width)
+    draw.line(points([(188, 226), (216, 226)]), fill=white, width=line_width)
+    draw.line(points([(202, 220), (202, 226)]), fill=white, width=line_width)
 
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
