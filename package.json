@@ -1,0 +1,63 @@
+{
+  "name": "chatgpt-local",
+  "version": "0.1.0-beta.1",
+  "description": "A focused, borderless Windows container for the ChatGPT web app.",
+  "main": "main.js",
+  "author": "gkoogz",
+  "license": "UNLICENSED",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --check main.js && node --check preload.js && node --check renderer/app.js && python tools/generate_icons.py --check",
+    "icons": "python tools/generate_icons.py",
+    "dist": "electron-builder --win --x64 --publish never",
+    "dist:portable": "electron-builder --win portable --x64 --publish never",
+    "dist:installer": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^36.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.gkoogz.chatgptlocal",
+    "productName": "ChatGPT Local",
+    "artifactName": "ChatGPT-Local-${version}-${os}-${arch}.${ext}",
+    "asar": true,
+    "compression": "maximum",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "assets/icons/chatgpt-local.ico",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "assets/icons/chatgpt-local.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ChatGPT Local"
+    },
+    "portable": {
+      "artifactName": "ChatGPT-Local-${version}-portable.${ext}"
+    }
+  }
+}

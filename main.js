@@ -1,0 +1,283 @@
+const path = require('node:path');
+const {
+  app,
+  BrowserWindow,
+  WebContentsView,
+  ipcMain,
+  session,
+  shell,
+} = require('electron');
+
+const APP_NAME = 'ChatGPT Local';
+const HOME_URL = 'https://chatgpt.com/';
+const IDLE_RETURN_MS = 30 * 60 * 1000;
+const CHROME_HEIGHT = 58;
+const APP_PARTITION = 'persist:chatgpt-local';
+
+let mainWindow;
+let nextTabId = 1;
+let activeTabId = 1;
+let tabs = [];
+let idleTimer;
+
+function isHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function isChatGptUrl(value) {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === 'chatgpt.com' || hostname.endsWith('.chatgpt.com');
+  } catch {
+    return false;
+  }
+}
+
+function isOpenAiAuthUrl(value) {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hostname === 'auth.openai.com'
+      || hostname === 'accounts.openai.com'
+      || hostname === 'chat.openai.com';
+  } catch {
+    return false;
+  }
+}
+
+function getTab(tabId) {
+  return tabs.find((tab) => tab.id === tabId);
+}
+
+function publicTab(tab) {
+  return {
+    id: tab.id,
+    title: tab.title || (tab.pinned ? 'ChatGPT' : 'New tab'),
+    url: tab.url,
+    pinned: tab.pinned,
+    active: tab.id === activeTabId,
+  };
+}
+
+function sendState() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('tabs:state', {
+    tabs: tabs.map(publicTab),
+    activeTabId,
+    isMaximized: mainWindow.isMaximized(),
+  });
+}
+
+function layoutActiveView() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const tab = getTab(activeTabId);
+  if (!tab) return;
+  const [width, height] = mainWindow.getContentSize();
+  tab.view.setBounds({
+    x: 0,
+    y: CHROME_HEIGHT,
+    width,
+    height: Math.max(0, height - CHROME_HEIGHT),
+  });
+}
+
+function showActiveView() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  for (const tab of tabs) {
+    if (tab.id === activeTabId) {
+      if (!mainWindow.contentView.children.includes(tab.view)) {
+        mainWindow.contentView.addChildView(tab.view);
+      }
+      layoutActiveView();
+    } else if (mainWindow.contentView.children.includes(tab.view)) {
+      mainWindow.contentView.removeChildView(tab.view);
+    }
+  }
+  sendState();
+}
+
+function resetIdleTimer() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    const homeTab = getTab(1);
+    if (!homeTab) return;
+    activeTabId = 1;
+    showActiveView();
+  }, IDLE_RETURN_MS);
+}
+
+function routePinnedNavigation(tab, url, event) {
+  if (!tab.pinned || isChatGptUrl(url) || isOpenAiAuthUrl(url)) return false;
+  if (event) event.preventDefault();
+  createTab(url);
+  return true;
+}
+
+function attachTabEvents(tab) {
+  const contents = tab.view.webContents;
+
+  contents.on('page-title-updated', (event, title) => {
+    event.preventDefault();
+    tab.title = title || (tab.pinned ? 'ChatGPT' : 'New tab');
+    sendState();
+  });
+
+  contents.on('did-start-loading', () => {
+    resetIdleTimer();
+    sendState();
+  });
+
+  contents.on('did-navigate', (_event, url) => {
+    tab.url = url;
+    resetIdleTimer();
+    sendState();
+  });
+
+  contents.on('did-navigate-in-page', (_event, url) => {
+    tab.url = url;
+    resetIdleTimer();
+    sendState();
+  });
+
+  contents.on('will-navigate', (event, url) => {
+    if (routePinnedNavigation(tab, url, event)) return;
+    tab.url = url;
+    resetIdleTimer();
+  });
+
+  contents.setWindowOpenHandler(({ url }) => {
+    if (isHttpUrl(url)) createTab(url);
+    else if (url) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  contents.on('input-event', resetIdleTimer);
+  contents.on('render-process-gone', () => {
+    tab.title = `${tab.pinned ? 'ChatGPT' : 'Tab'} (reloading)`;
+    sendState();
+  });
+}
+
+function createTab(url = HOME_URL, options = {}) {
+  const tab = {
+    id: nextTabId++,
+    title: options.pinned ? 'ChatGPT' : 'New tab',
+    url,
+    pinned: Boolean(options.pinned),
+    view: new WebContentsView({
+      webPreferences: {
+        session: session.fromPartition(APP_PARTITION),
+        contextIsolation: true,
+        sandbox: true,
+        nodeIntegration: false,
+      },
+    }),
+  };
+
+  tab.view.setBackgroundColor('#000000');
+  attachTabEvents(tab);
+  if (tab.pinned) tabs.unshift(tab);
+  else tabs.push(tab);
+  if (options.select !== false) activeTabId = tab.id;
+  tab.view.webContents.loadURL(url);
+  showActiveView();
+  resetIdleTimer();
+  return tab;
+}
+
+function closeTab(tabId) {
+  const tab = getTab(tabId);
+  if (!tab || tab.pinned) return;
+  const index = tabs.indexOf(tab);
+  tabs.splice(index, 1);
+  tab.view.webContents.close();
+  if (activeTabId === tabId) {
+    activeTabId = tabs[Math.max(0, index - 1)]?.id || 1;
+  }
+  showActiveView();
+  resetIdleTimer();
+}
+
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1280,
+    height: 820,
+    minWidth: 680,
+    minHeight: 460,
+    frame: false,
+    resizable: true,
+    backgroundColor: '#000000',
+    show: false,
+    title: APP_NAME,
+    icon: path.join(__dirname, 'assets', 'icons', 'chatgpt-local.ico'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+    },
+  });
+
+  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  mainWindow.on('resize', layoutActiveView);
+  mainWindow.on('maximize', sendState);
+  mainWindow.on('unmaximize', sendState);
+  mainWindow.on('focus', resetIdleTimer);
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    sendState();
+  });
+  mainWindow.on('closed', () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    mainWindow = null;
+  });
+}
+
+function registerIpc() {
+  ipcMain.on('window:minimize', () => mainWindow?.minimize());
+  ipcMain.on('window:toggle-maximize', () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMaximized()) mainWindow.unmaximize();
+    else mainWindow.maximize();
+  });
+  ipcMain.on('window:close', () => mainWindow?.close());
+  ipcMain.on('tabs:new', (_event, url) => {
+    createTab(isHttpUrl(url) ? url : HOME_URL);
+  });
+  ipcMain.on('tabs:select', (_event, tabId) => {
+    if (!getTab(tabId)) return;
+    activeTabId = tabId;
+    showActiveView();
+    resetIdleTimer();
+  });
+  ipcMain.on('tabs:close', (_event, tabId) => closeTab(tabId));
+  ipcMain.on('tabs:home', () => {
+    activeTabId = 1;
+    showActiveView();
+    resetIdleTimer();
+  });
+  ipcMain.on('tabs:reload', () => getTab(activeTabId)?.view.webContents.reload());
+  ipcMain.on('tabs:return-home', () => {
+    activeTabId = 1;
+    showActiveView();
+  });
+}
+
+app.whenReady().then(() => {
+  app.setName(APP_NAME);
+  registerIpc();
+  createMainWindow();
+  createTab(HOME_URL, { pinned: true });
+  resetIdleTimer();
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});

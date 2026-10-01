@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChatGPT Local</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="chrome" aria-label="ChatGPT Local window controls">
+      <div class="brand drag-region">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <span class="brand-name">ChatGPT Local</span>
+      </div>
+
+      <nav id="tabs" class="tabs hidden" aria-label="Browser tabs"></nav>
+
+      <div class="toolbar no-drag">
+        <button id="home" class="tool-button" title="ChatGPT home" aria-label="ChatGPT home">⌂</button>
+        <button id="reload" class="tool-button" title="Reload tab" aria-label="Reload tab">↻</button>
+        <button id="new-tab" class="tool-button" title="New tab" aria-label="New tab">＋</button>
+        <span class="toolbar-divider" aria-hidden="true"></span>
+        <button id="minimize" class="window-button" title="Minimize" aria-label="Minimize">−</button>
+        <button id="maximize" class="window-button" title="Maximize" aria-label="Maximize">□</button>
+        <button id="close" class="window-button close-button" title="Close" aria-label="Close">×</button>
+      </div>
+    </header>
+    <main aria-label="ChatGPT web content"></main>
+    <script src="./app.js"></script>
+  </body>
+</html>
