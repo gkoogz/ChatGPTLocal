@@ -22,7 +22,12 @@
       <nav id="tabs" class="tabs hidden" aria-label="Browser tabs"></nav>
 
       <div class="toolbar no-drag">
-        <button id="home" class="tool-button" title="ChatGPT home" aria-label="ChatGPT home">⌂</button>
+        <button id="home" class="tool-button" title="ChatGPT home" aria-label="ChatGPT home">
+          <svg class="toolbar-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 10.5 12 3l9 7.5" />
+            <path d="M5 9.5V20h14V9.5M9.5 20v-6h5v6" />
+          </svg>
+        </button>
         <button id="reload" class="tool-button" title="Reload tab" aria-label="Reload tab">↻</button>
         <button id="new-tab" class="tool-button" title="New tab" aria-label="New tab">＋</button>
         <span class="toolbar-divider" aria-hidden="true"></span>

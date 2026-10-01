@@ -26,22 +26,42 @@ def draw_icon(size: int) -> Image.Image:
     def points(values: list[tuple[int, int]]) -> list[tuple[int, int]]:
         return [(round(x * scale), round(y * scale)) for x, y in values]
 
+    # Windows often chooses the 32px or 48px frame for Start/search results.
+    # Give the badge a little more real estate in those frames so it survives
+    # the downsample without changing the full-size artwork.
+    badge_multiplier = 1.4 if size <= 48 else (1.25 if size <= 64 else (1.1 if size <= 128 else 1.0))
+
+    def badge_box(values: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+        left, top, right, bottom = values
+        left = 256 - (256 - left) * badge_multiplier
+        top = 256 - (256 - top) * badge_multiplier
+        right = 256 - (256 - right) * badge_multiplier
+        bottom = 256 - (256 - bottom) * badge_multiplier
+        return box((round(left), round(top), round(right), round(bottom)))
+
+    def badge_points(values: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        return [
+            (round((256 - (256 - x) * badge_multiplier) * scale),
+             round((256 - (256 - y) * badge_multiplier) * scale))
+            for x, y in values
+        ]
+
     # Clear a transparent pocket so the monitor slightly overlaps rather than
     # merely sitting on top of the official logo.
-    draw.rounded_rectangle(box((153, 159, 247, 229)), radius=round(15 * scale), fill=(0, 0, 0, 0))
-    draw.polygon(points([(184, 214), (218, 214), (218, 225), (230, 225), (230, 238), (170, 238), (170, 225), (184, 225)]), fill=(0, 0, 0, 0))
+    draw.rounded_rectangle(badge_box((153, 159, 247, 229)), radius=round(15 * scale * badge_multiplier), fill=(0, 0, 0, 0))
+    draw.polygon(badge_points([(184, 214), (218, 214), (218, 225), (230, 225), (230, 238), (170, 238), (170, 225), (184, 225)]), fill=(0, 0, 0, 0))
 
-    monitor = box((160, 165, 242, 220))
-    radius = round(7 * scale)
+    monitor = badge_box((160, 165, 242, 220))
+    radius = round(7 * scale * badge_multiplier)
     # Match the heavy white stroke of the source ChatGPT mark rather than
     # using a thin generic UI outline.
     line_width = round(12 * scale)
     white = "#f4f4f4"
     black = "#050505"
     draw.rounded_rectangle(monitor, radius=radius, fill=white)
-    draw.rounded_rectangle(box((172, 177, 230, 208)), radius=round(3 * scale), fill=black)
-    draw.line(points([(188, 226), (216, 226)]), fill=white, width=line_width)
-    draw.line(points([(202, 220), (202, 226)]), fill=white, width=line_width)
+    draw.rounded_rectangle(badge_box((172, 177, 230, 208)), radius=round(3 * scale * badge_multiplier), fill=black)
+    draw.line(badge_points([(188, 226), (216, 226)]), fill=white, width=line_width)
+    draw.line(badge_points([(202, 220), (202, 226)]), fill=white, width=line_width)
 
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
