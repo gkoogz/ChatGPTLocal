@@ -23,11 +23,11 @@ with another desktop browser. Sign in once inside ChatGPT Local; its own profile
 is persistent under the normal Electron application-data location. Links opened
 by the app stay in app tabs, and the site remains the real ChatGPT web app.
 
-## Icon choices
+## Icon
 
-The release icon uses the mint monitor badge from `assets/icons/option-a.svg`.
-Blue and amber alternatives are in the same folder, with previews and build
-instructions in `assets/icons/README.md`.
+The release icon uses the dark ChatGPT icon shipped with the installed Codex
+client as its exact base, with a small monitor badge and transparent knockout
+at the lower-right. The source and generated sizes are in `assets/icons/`.
 
 ## Development
 

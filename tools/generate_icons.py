@@ -1,13 +1,8 @@
-"""Generate the Windows ICO and preview PNGs for ChatGPT Local.
-
-The artwork is intentionally recreated from simple primitives so icon builds do
-not depend on a network service or a proprietary source asset.
-"""
+"""Overlay a minimal monitor badge on the installed Codex ChatGPT icon."""
 
 from __future__ import annotations
 
 import argparse
-import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -15,45 +10,37 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets" / "icons"
+SOURCE = OUT / "chatgpt-codex-dark.ico"
 
 
-def rotate(point: tuple[float, float], angle: float, center: tuple[float, float]) -> tuple[float, float]:
-    px, py = point
-    cx, cy = center
-    radians = math.radians(angle)
-    x = px - cx
-    y = py - cy
-    return (x * math.cos(radians) - y * math.sin(radians) + cx,
-            x * math.sin(radians) + y * math.cos(radians) + cy)
-
-
-def draw_icon(size: int, monitor_color: str = "#a8e6cf") -> Image.Image:
-    scale = size / 256
-    image = Image.new("RGBA", (size, size), "#050505")
+def draw_icon(size: int) -> Image.Image:
+    """Keep the Codex logo pixels and add a knocked-out monitor badge."""
+    work_size = 1024
+    image = Image.open(SOURCE).convert("RGBA").resize((work_size, work_size), Image.Resampling.LANCZOS)
     draw = ImageDraw.Draw(image)
-    radius = int(54 * scale)
-    draw.rounded_rectangle((0, 0, size - 1, size - 1), radius=radius, fill="#050505")
+    scale = work_size / 256
 
-    stroke = max(2, int(14 * scale))
-    center = (128 * scale, 128 * scale)
-    box = (92 * scale, 14 * scale, 164 * scale, 154 * scale)
-    for angle in (30, 90, 150):
-        points = []
-        for step in range(121):
-            theta = math.pi * 2 * step / 120
-            x = 128 * scale + 36 * scale * math.cos(theta)
-            y = 84 * scale + 70 * scale * math.sin(theta)
-            points.append(rotate((x, y), angle, center))
-        draw.line(points, fill="#f2f2f2", width=stroke, joint="curve")
+    def box(values: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+        return tuple(round(value * scale) for value in values)
 
-    x0, y0 = 152 * scale, 160 * scale
-    x1, y1 = 228 * scale, 209 * scale
-    badge_stroke = max(2, int(8 * scale))
-    draw.rounded_rectangle((x0, y0, x1, y1), radius=max(2, int(7 * scale)), fill=monitor_color, outline="#050505", width=badge_stroke)
-    draw.rounded_rectangle((x0 + 8 * scale, y0 + 8 * scale, x1 - 8 * scale, y0 + 40 * scale), radius=max(1, int(3 * scale)), fill="#101916")
-    draw.line((178 * scale, 221 * scale, 202 * scale, 221 * scale), fill=monitor_color, width=stroke, joint="curve")
-    draw.line((190 * scale, 209 * scale, 190 * scale, 221 * scale), fill=monitor_color, width=stroke)
-    return image
+    def points(values: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        return [(round(x * scale), round(y * scale)) for x, y in values]
+
+    # Clear a transparent pocket so the monitor slightly overlaps rather than
+    # merely sitting on top of the official logo.
+    draw.rounded_rectangle(box((153, 159, 247, 229)), radius=round(15 * scale), fill=(0, 0, 0, 0))
+    draw.polygon(points([(184, 214), (218, 214), (218, 225), (230, 225), (230, 238), (170, 238), (170, 225), (184, 225)]), fill=(0, 0, 0, 0))
+
+    monitor = box((160, 165, 242, 220))
+    radius = round(7 * scale)
+    outline = round(4 * scale)
+    draw.rounded_rectangle(monitor, radius=radius, fill="#f4f4f4")
+    draw.rounded_rectangle(box((168, 173, 234, 211)), radius=round(3 * scale), fill="#050505")
+    draw.rounded_rectangle(box((172, 177, 230, 207)), radius=round(2 * scale), outline="#a8e6cf", width=round(2 * scale))
+    draw.line(points([(188, 226), (216, 226)]), fill="#f4f4f4", width=outline)
+    draw.line(points([(202, 220), (202, 226)]), fill="#f4f4f4", width=outline)
+
+    return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
 def main(check: bool = False) -> None:
@@ -61,6 +48,8 @@ def main(check: bool = False) -> None:
     sizes = (16, 24, 32, 48, 64, 128, 256)
     expected = [OUT / "chatgpt-local.ico", *[OUT / f"chatgpt-local-{size}.png" for size in sizes]]
     if check:
+        if not SOURCE.exists():
+            raise SystemExit(f"Missing installed Codex icon source: {SOURCE}")
         missing = [str(path) for path in expected if not path.exists()]
         if missing:
             raise SystemExit("Missing generated icon files: " + ", ".join(missing))
