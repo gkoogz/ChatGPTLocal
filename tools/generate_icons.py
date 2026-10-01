@@ -33,11 +33,13 @@ def draw_icon(size: int) -> Image.Image:
 
     monitor = box((160, 165, 242, 220))
     radius = round(7 * scale)
-    line_width = round(4 * scale)
+    # Match the heavy white stroke of the source ChatGPT mark rather than
+    # using a thin generic UI outline.
+    line_width = round(12 * scale)
     white = "#f4f4f4"
     black = "#050505"
-    draw.rounded_rectangle(monitor, radius=radius, fill=black, outline=white, width=line_width)
-    draw.rounded_rectangle(box((168, 173, 234, 211)), radius=round(3 * scale), outline=white, width=line_width)
+    draw.rounded_rectangle(monitor, radius=radius, fill=white)
+    draw.rounded_rectangle(box((172, 177, 230, 208)), radius=round(3 * scale), fill=black)
     draw.line(points([(188, 226), (216, 226)]), fill=white, width=line_width)
     draw.line(points([(202, 220), (202, 226)]), fill=white, width=line_width)
 
