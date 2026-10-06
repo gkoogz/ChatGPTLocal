@@ -2,6 +2,7 @@ const path = require('node:path');
 const {
   app,
   BrowserWindow,
+  globalShortcut,
   WebContentsView,
   ipcMain,
   session,
@@ -180,6 +181,9 @@ function createTab(url = HOME_URL, options = {}) {
 
   tab.view.setBackgroundColor('#000000');
   attachTabEvents(tab);
+  if (options.focusComposer) {
+    tab.view.webContents.once('did-finish-load', () => focusComposer(tab));
+  }
   if (tab.pinned) tabs.unshift(tab);
   else tabs.push(tab);
   if (options.select !== false) activeTabId = tab.id;
@@ -187,6 +191,44 @@ function createTab(url = HOME_URL, options = {}) {
   showActiveView();
   resetIdleTimer();
   return tab;
+}
+
+function focusComposer(tab) {
+  tab.view.webContents.focus();
+  tab.view.webContents.executeJavaScript(`(async () => {
+    const selectors = [
+      '#prompt-textarea',
+      '[contenteditable="true"][role="textbox"]',
+      'textarea[placeholder]'
+    ];
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const composer = selectors
+        .flatMap((selector) => [...document.querySelectorAll(selector)])
+        .find((element) => element.getClientRects().length > 0 && !element.disabled);
+      if (composer) {
+        composer.focus({ preventScroll: true });
+        if (composer.isContentEditable) {
+          const selection = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(composer);
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return false;
+  })()`).catch(() => {});
+}
+
+function openNewChat() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  createTab(HOME_URL, { focusComposer: true });
 }
 
 function closeTab(tabId) {
@@ -270,6 +312,9 @@ function registerIpc() {
 app.whenReady().then(() => {
   app.setName(APP_NAME);
   registerIpc();
+  if (!globalShortcut.register('Alt+Space', openNewChat)) {
+    console.warn('Could not register the Alt+Space global shortcut.');
+  }
   createMainWindow();
   createTab(HOME_URL, { pinned: true });
   resetIdleTimer();
@@ -277,6 +322,8 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
   });
 });
+
+app.on('will-quit', () => globalShortcut.unregisterAll());
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

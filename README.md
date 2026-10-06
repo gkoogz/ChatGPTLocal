@@ -13,6 +13,9 @@ with compact minimize, maximize/restore and close controls.
 - The pinned ChatGPT tab stays at the far left. After 30 minutes without input,
   the app changes focus to that tab without reloading it or changing any other tab.
 - `Ctrl+T`, `Ctrl+W`, and `Ctrl+L` provide familiar tab, close, and home shortcuts.
+- `Alt+Space` opens a fresh ChatGPT tab and focuses its message field, even when
+  another app is active. ChatGPT Local must be running for the global shortcut
+  to work.
 
 ## Browser profile note
 
