@@ -14,6 +14,12 @@ const HOME_URL = 'https://chatgpt.com/';
 const IDLE_RETURN_MS = 60 * 60 * 1000;
 const CHROME_HEIGHT = 58;
 const APP_PARTITION = 'persist:chatgpt-local';
+const WEBSITE_NO_DRAG_CSS = `
+  *, *::before, *::after {
+    -webkit-app-region: no-drag !important;
+    app-region: no-drag !important;
+  }
+`;
 
 let mainWindow;
 let chromeView;
@@ -148,6 +154,15 @@ function routePinnedNavigation(tab, url, event) {
 
 function attachTabEvents(tab) {
   const contents = tab.view.webContents;
+
+  // Websites can supply their own native drag regions, even on invisible headers.
+  // Only the separate app chrome may drag the window. User-origin CSS also wins
+  // over author !important rules and covers elements added by SPA navigation.
+  contents.on('dom-ready', () => {
+    contents.insertCSS(WEBSITE_NO_DRAG_CSS, { cssOrigin: 'user' }).catch((error) => {
+      console.error('Could not disable website drag regions:', error);
+    });
+  });
 
   contents.on('page-title-updated', (event, title) => {
     event.preventDefault();
