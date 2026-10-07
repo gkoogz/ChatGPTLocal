@@ -1,7 +1,7 @@
 const path = require('node:path');
 const {
   app,
-  BrowserWindow,
+  BaseWindow,
   globalShortcut,
   WebContentsView,
   ipcMain,
@@ -16,6 +16,7 @@ const CHROME_HEIGHT = 58;
 const APP_PARTITION = 'persist:chatgpt-local';
 
 let mainWindow;
+let chromeView;
 let nextTabId = 1;
 let activeTabId = 1;
 let tabs = [];
@@ -65,8 +66,9 @@ function publicTab(tab) {
 }
 
 function sendState() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  mainWindow.webContents.send('tabs:state', {
+  if (!mainWindow || mainWindow.isDestroyed()
+      || !chromeView || chromeView.webContents.isDestroyed()) return;
+  chromeView.webContents.send('tabs:state', {
     tabs: tabs.map(publicTab),
     activeTabId,
     isMaximized: mainWindow.isMaximized(),
@@ -75,9 +77,17 @@ function sendState() {
 
 function layoutActiveView() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  const [width, height] = mainWindow.getContentSize();
+  if (chromeView && !chromeView.webContents.isDestroyed()) {
+    chromeView.setBounds({
+      x: 0,
+      y: 0,
+      width,
+      height: CHROME_HEIGHT,
+    });
+  }
   const tab = getTab(activeTabId);
   if (!tab) return;
-  const [width, height] = mainWindow.getContentSize();
   tab.view.setBounds({
     x: 0,
     y: CHROME_HEIGHT,
@@ -88,16 +98,19 @@ function layoutActiveView() {
 
 function showActiveView() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (chromeView && !mainWindow.contentView.children.includes(chromeView)) {
+    mainWindow.contentView.addChildView(chromeView);
+  }
   for (const tab of tabs) {
     if (tab.id === activeTabId) {
       if (!mainWindow.contentView.children.includes(tab.view)) {
         mainWindow.contentView.addChildView(tab.view);
       }
-      layoutActiveView();
     } else if (mainWindow.contentView.children.includes(tab.view)) {
       mainWindow.contentView.removeChildView(tab.view);
     }
   }
+  layoutActiveView();
   sendState();
 }
 
@@ -260,7 +273,7 @@ function closeTab(tabId) {
 }
 
 function createMainWindow() {
-  mainWindow = new BrowserWindow({
+  mainWindow = new BaseWindow({
     width: 1280,
     height: 820,
     minWidth: 680,
@@ -271,6 +284,9 @@ function createMainWindow() {
     show: false,
     title: APP_NAME,
     icon: path.join(__dirname, 'assets', 'icons', 'chatgpt-local.ico'),
+  });
+
+  chromeView = new WebContentsView({
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -279,17 +295,31 @@ function createMainWindow() {
     },
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  chromeView.setBackgroundColor('#000000');
+  mainWindow.contentView.addChildView(chromeView);
+  chromeView.webContents.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.on('resize', layoutActiveView);
   mainWindow.on('maximize', sendState);
   mainWindow.on('unmaximize', sendState);
   mainWindow.on('focus', resetIdleTimer);
-  mainWindow.once('ready-to-show', () => {
+  chromeView.webContents.once('did-finish-load', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    layoutActiveView();
     mainWindow.show();
     sendState();
   });
   mainWindow.on('closed', () => {
     if (idleTimer) clearTimeout(idleTimer);
+    if (chromeView && !chromeView.webContents.isDestroyed()) {
+      chromeView.webContents.close();
+    }
+    for (const tab of tabs) {
+      if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
+    }
+    chromeView = null;
+    tabs = [];
+    nextTabId = 1;
+    activeTabId = 1;
     mainWindow = null;
   });
 }
@@ -334,7 +364,11 @@ app.whenReady().then(() => {
   createTab(HOME_URL, { pinned: true });
   resetIdleTimer();
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+    if (BaseWindow.getAllWindows().length === 0) {
+      createMainWindow();
+      createTab(HOME_URL, { pinned: true });
+      resetIdleTimer();
+    }
   });
 });
 
