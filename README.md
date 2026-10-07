@@ -10,8 +10,8 @@ with compact minimize, maximize/restore and close controls.
 - Links that would take the pinned tab off the ChatGPT site open in a new app tab.
 - Tabs are hidden from the chrome when the pinned home tab is the only tab.
 - A persistent embedded-browser profile keeps the app's ChatGPT login between launches.
-- The pinned ChatGPT tab stays at the far left. After 30 minutes without input,
-  the app changes focus to that tab without reloading it or changing any other tab.
+- The pinned ChatGPT tab stays at the far left. After one hour without input,
+  temporary tabs are closed and the pinned ChatGPT tab is shown.
 - `Ctrl+T`, `Ctrl+W`, and `Ctrl+L` provide familiar tab, close, and home shortcuts.
 - `Alt+Space` opens a fresh ChatGPT tab and focuses its message field, even when
   another app is active. ChatGPT Local must be running for the global shortcut

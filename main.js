@@ -11,7 +11,7 @@ const {
 
 const APP_NAME = 'ChatGPT Local';
 const HOME_URL = 'https://chatgpt.com/';
-const IDLE_RETURN_MS = 30 * 60 * 1000;
+const IDLE_RETURN_MS = 60 * 60 * 1000;
 const CHROME_HEIGHT = 58;
 const APP_PARTITION = 'persist:chatgpt-local';
 
@@ -101,12 +101,27 @@ function showActiveView() {
   sendState();
 }
 
+function disposeTabView(tab) {
+  if (mainWindow && !mainWindow.isDestroyed()
+      && mainWindow.contentView.children.includes(tab.view)) {
+    mainWindow.contentView.removeChildView(tab.view);
+  }
+  tab.view.webContents.close();
+}
+
 function resetIdleTimer() {
   if (idleTimer) clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
-    const homeTab = getTab(1);
+    idleTimer = null;
+    const homeTab = tabs.find((tab) => tab.pinned);
     if (!homeTab) return;
-    activeTabId = 1;
+
+    for (const tab of tabs.filter((candidate) => !candidate.pinned)) {
+      tabs.splice(tabs.indexOf(tab), 1);
+      disposeTabView(tab);
+    }
+
+    activeTabId = homeTab.id;
     showActiveView();
   }, IDLE_RETURN_MS);
 }
@@ -236,7 +251,7 @@ function closeTab(tabId) {
   if (!tab || tab.pinned) return;
   const index = tabs.indexOf(tab);
   tabs.splice(index, 1);
-  tab.view.webContents.close();
+  disposeTabView(tab);
   if (activeTabId === tabId) {
     activeTabId = tabs[Math.max(0, index - 1)]?.id || 1;
   }
