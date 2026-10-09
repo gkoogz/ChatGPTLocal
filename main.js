@@ -11,6 +11,7 @@ const {
 
 const APP_NAME = 'ChatGPT Local';
 const HOME_URL = 'https://chatgpt.com/';
+const START_MINIMIZED_ARG = '--start-minimized';
 const IDLE_RETURN_MS = 60 * 60 * 1000;
 const CHROME_HEIGHT = 58;
 const APP_PARTITION = 'persist:chatgpt-local';
@@ -27,6 +28,7 @@ let nextTabId = 1;
 let activeTabId = 1;
 let tabs = [];
 let idleTimer;
+const startMinimized = process.argv.includes(START_MINIMIZED_ARG);
 
 function isHttpUrl(value) {
   try {
@@ -41,6 +43,16 @@ function isChatGptUrl(value) {
   try {
     const hostname = new URL(value).hostname.toLowerCase();
     return hostname === 'chatgpt.com' || hostname.endsWith('.chatgpt.com');
+  } catch {
+    return false;
+  }
+}
+
+function isChatGptHomeUrl(value) {
+  try {
+    const url = new URL(value);
+    return (url.hostname === 'chatgpt.com' || url.hostname.endsWith('.chatgpt.com'))
+      && url.pathname === '/';
   } catch {
     return false;
   }
@@ -238,7 +250,7 @@ function createTab(url = HOME_URL, options = {}) {
 
 function focusComposer(tab) {
   tab.view.webContents.focus();
-  tab.view.webContents.executeJavaScript(`(async () => {
+  return tab.view.webContents.executeJavaScript(`(async () => {
     const selectors = [
       '#prompt-textarea',
       '[contenteditable="true"][role="textbox"]',
@@ -263,7 +275,7 @@ function focusComposer(tab) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     return false;
-  })()`).catch(() => {});
+  })()`).catch(() => false);
 }
 
 function openNewChat() {
@@ -271,6 +283,15 @@ function openNewChat() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
+  const activeTab = getTab(activeTabId);
+  if (activeTab && isChatGptHomeUrl(activeTab.url)) {
+    focusComposer(activeTab).then((focused) => {
+      if (!focused && mainWindow && !mainWindow.isDestroyed()) {
+        createTab(HOME_URL, { focusComposer: true });
+      }
+    });
+    return;
+  }
   createTab(HOME_URL, { focusComposer: true });
 }
 
@@ -321,6 +342,7 @@ function createMainWindow() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     layoutActiveView();
     mainWindow.show();
+    if (startMinimized) mainWindow.minimize();
     sendState();
   });
   mainWindow.on('closed', () => {
@@ -371,6 +393,12 @@ function registerIpc() {
 
 app.whenReady().then(() => {
   app.setName(APP_NAME);
+  if (process.platform === 'win32' && app.isPackaged) {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      args: [START_MINIMIZED_ARG],
+    });
+  }
   registerIpc();
   if (!globalShortcut.register('Alt+Space', openNewChat)) {
     console.warn('Could not register the Alt+Space global shortcut.');
